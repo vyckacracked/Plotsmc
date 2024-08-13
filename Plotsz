@@ -1,0 +1,78 @@
+options:
+    plot-size: 10
+    rent-cost: 100
+    invite-cost: 20
+    rent-time: 7d
+
+variables:
+    {plots::*} = list of plots
+    {plotowners::*} = list of plot owners
+    {plotrent::%player%} = time left on rent
+
+on rightclick on sign:
+    if line 1 of event-block is "&b[Plot Manager]":
+        open chest with 3 rows named "&aPlot Management" to player
+        format slot 0 of player with paper named "&bRent Plot" with lore "&7Click to rent a plot" to close then run function rentPlot(player)
+        format slot 1 of player with emerald named "&bInvite Friend" with lore "&7Click to invite a friend" to close then run function inviteFriendGUI(player)
+        format slot 2 of player with book named "&bPlot Info" with lore "&7View your plot details" to close then run function plotInfo(player)
+
+function rentPlot(p: player):
+    if {plotowners::%p%} is set:
+        send "&cYou already own a plot!" to p
+    else:
+        if p's balance is greater than or equal to {@rent-cost}:
+            remove {@rent-cost} from p's balance
+            set {plotowners::%p%} to p's name
+            set {plotrent::%p%} to now + {@rent-time}
+            send "&aYou have successfully rented a plot!" to p
+        else:
+            send "&cYou don't have enough money to rent a plot!" to p
+
+function inviteFriendGUI(p: player):
+    open chest with 3 rows named "&aInvite Friend" to p
+    format all gui slots of player with barrier named "&cNo Player Selected" 
+    loop all players:
+        if loop-player is not p:
+            format next slot of player with skull of loop-player named "&a%loop-player%" with lore "&7Click to invite %loop-player%" to close then run function inviteFriend(p, loop-player)
+
+function inviteFriend(p: player, target: player):
+    if {plotowners::%p%} is not set:
+        send "&cYou don't own a plot to invite friends!" to p
+    else:
+        if target is online:
+            if p's balance is greater than or equal to {@invite-cost}:
+                remove {@invite-cost} from p's balance
+                add target to {plots::%p%::*}
+                send "&aYou have successfully invited %target% to your plot!" to p
+                send "&aYou have been invited to %p%'s plot!" to target
+            else:
+                send "&cYou don't have enough coins to invite a friend!" to p
+        else:
+            send "&cThe player %target% is not online!" to p
+
+function plotInfo(p: player):
+    if {plotowners::%p%} is not set:
+        send "&cYou don't own a plot!" to p
+    else:
+        send "&aYour Plot Info:" to p
+        send "&7Plot Size: {@plot-size}x{@plot-size}" to p
+        send "&7Time Left on Rent: %{plotrent::%p%}%" to p
+        send "&7Invited Friends: %size of {plots::%p%::*}%" to p
+        send "&7Friends: %join {plots::%p%::*} with commas%" to p
+
+on join:
+    if {plotrent::%player%} is set:
+        if {plotrent::%player%} <= now:
+            delete {plotowners::%player%}
+            delete {plotrent::%player%}
+            clear {plots::%player%::*}
+            send "&cYour plot rent has expired!" to player
+
+# To reset or manage plots manually
+command /clearplot <player>:
+    permission: op
+    trigger:
+        delete {plotowners::%arg-1%}
+        delete {plotrent::%arg-1%}
+        clear {plots::%arg-1%::*}
+        send "&aSuccessfully cleared plot for %arg-1%."
